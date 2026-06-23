@@ -134,6 +134,7 @@ function detectChanges_(prev, cur) {
   }
   if (prev.prazo !== cur.prazo)   ev.push({ type: 'prazo', to: cur.prazo });
   if (prev.owners !== curOwners)  ev.push({ type: 'responsavel' });
+  if (prev.projeto !== cur.projeto) ev.push({ type: 'projeto', from: prev.projeto, to: cur.projeto });
   return ev;
 }
 
@@ -221,6 +222,7 @@ function buildHeadline_(t, events) {
     if (e.type === 'status')      return '🔄 Status: ' + (e.from || '—') + ' → ' + (e.to || '—');
     if (e.type === 'prazo')       return '📅 Prazo: ' + (e.to ? formatDate_(e.to) : 'removido');
     if (e.type === 'responsavel') return '👤 Responsável atualizado';
+    if (e.type === 'projeto')     return '📁 Projeto: ' + (e.from || '—') + ' → ' + (e.to || '—');
     return '✏️ Atualizada';
   }).join('  ·  ');
 }
