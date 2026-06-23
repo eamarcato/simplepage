@@ -277,3 +277,44 @@ function resetState() {
   props.deleteProperty('LAST_RUN');
   Logger.log('Estado limpo.');
 }
+
+// ============================================================
+// TEMPO REAL (push) — recebe o webhook da automação do Notion
+// Publicar como "App da Web" (Implantar > Nova implantação > App da Web).
+// Opcional: defina a propriedade WEBHOOK_SECRET e use a URL com ?key=SECRET.
+// ============================================================
+function doPost(e) {
+  try {
+    var secret = cfg_('WEBHOOK_SECRET');
+    if (secret && (!e || !e.parameter || e.parameter.key !== secret)) {
+      return ContentService.createTextOutput('forbidden');
+    }
+    var body = (e && e.postData && e.postData.contents) ? JSON.parse(e.postData.contents) : {};
+    var pageId = (body.data && body.data.id) || body.id || (body.page && body.page.id);
+    if (!pageId) return ContentService.createTextOutput('sem page id');
+
+    var page = notionGetPage_(cfg_('NOTION_TOKEN'), pageId);
+    if (!page) return ContentService.createTextOutput('pagina nao encontrada');
+
+    var cur = parsePage_(page);
+    var events = detectChanges_(loadSnap_(cur.id), cur);
+    if (events.length) {
+      try { notifyProject_(cur, events); } catch (err) { Logger.log('Erro notify (push): ' + err); }
+    }
+    saveSnap_(cur);
+    return ContentService.createTextOutput('ok');
+  } catch (err) {
+    Logger.log('doPost erro: ' + err);
+    return ContentService.createTextOutput('erro');
+  }
+}
+
+function notionGetPage_(token, pageId) {
+  var resp = UrlFetchApp.fetch('https://api.notion.com/v1/pages/' + pageId, {
+    method: 'get',
+    headers: { Authorization: 'Bearer ' + token, 'Notion-Version': NOTION_VERSION },
+    muteHttpExceptions: true
+  });
+  if (resp.getResponseCode() >= 300) { Logger.log('Notion get page erro ' + resp.getResponseCode() + ': ' + resp.getContentText()); return null; }
+  return JSON.parse(resp.getContentText());
+}
