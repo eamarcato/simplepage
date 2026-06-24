@@ -93,5 +93,6 @@ Requer apenas que a **Google Chat API** e o **Admin SDK** estejam habilitados (P
 
 ## Notas
 - As mensagens nos grupos **existentes** saem pelo webhook (remetente do webhook); grupos **criados** pelo script postam via Chat API.
+- ⚠️ **@menção que notifica ("ping") só funciona via Chat API** (grupos criados pelo script). Pelo **webhook**, o Google **não permite** marcar uma pessoa específica — a menção sai só como **nome em negrito**, sem notificar. (Limitação do Google: <https://issuetracker.google.com/issues/329815971>.) Para ping de verdade em todos os grupos, use o caminho da Chat API (Parte B) ou adicione o app do Chat aos grupos existentes.
 - Cadência: 5 min (ajuste em `createTrigger`, `everyMinutes`).
 - Se a @menção não "pingar", confirme que a integração do Notion tem a permissão de **ler e-mails** e que a conta do Apps Script é **admin** (para o Admin SDK resolver `e-mail → ID`).

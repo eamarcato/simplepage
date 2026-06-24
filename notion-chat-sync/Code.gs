@@ -162,21 +162,30 @@ function notifyProject_(t, events) {
   var projeto  = t.projeto || 'GERAL';
 
   var headline = buildHeadline_(t, events);
-  var mention  = mentionFor_(t.owners);
-  var text     = (mention ? mention + ' — ' : '') + headline;
   var card     = buildCard_(t, events, headline);
 
-  // 1) Projeto já tem webhook configurado -> usa o webhook (remetente "Notion")
-  if (webhooks[projeto]) { postWebhook_(webhooks[projeto], text, card); return; }
+  // 1) Projeto já tem webhook configurado -> usa o webhook (remetente "Notion").
+  //    ATENÇÃO: webhooks do Google Chat NÃO conseguem "pingar" uma pessoa específica
+  //    (limitação do Google), então a menção sai apenas como nome em *negrito*.
+  if (webhooks[projeto]) {
+    var bold = t.owners.map(function (o) { return '*' + (o.name || o.email) + '*'; }).join(' ');
+    postWebhook_(webhooks[projeto], (bold ? bold + ' — ' : '') + headline, card);
+    return;
+  }
 
-  // 2) Projeto sem grupo -> cria o grupo + adiciona o time (Fase 2) e posta via Chat API
+  // 2) Projeto sem grupo -> cria o grupo + adiciona o time (Fase 2) e posta via Chat API.
+  //    Só por aqui a @menção REAL (<users/ID>) funciona e notifica a pessoa.
   var spaceName = spaces[projeto];
   if (!spaceName) {
     spaceName = createSpaceForProject_(projeto);
     if (spaceName) { spaces[projeto] = spaceName; setCfgJson_('SPACES_JSON', spaces); }
   }
-  if (spaceName) postChatApi_(spaceName, text, card);
-  else Logger.log('Sem grupo para o projeto "' + projeto + '" e não foi possível criar.');
+  if (spaceName) {
+    var ping = mentionFor_(t.owners);
+    postChatApi_(spaceName, (ping ? ping + ' — ' : '') + headline, card);
+  } else {
+    Logger.log('Sem grupo para o projeto "' + projeto + '" e não foi possível criar.');
+  }
 }
 
 function createSpaceForProject_(projeto) {
