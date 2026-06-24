@@ -290,6 +290,90 @@ function resetState() {
 }
 
 // ============================================================
+// DIAGNÓSTICO DE INSTALAÇÃO — RODE ESTA PRIMEIRO (caminho completo)
+// Mostra um checklist ✅/❌ no log (menu "Execução" > "Ver registros").
+// Manda o print/registro pro time se algo estiver ❌.
+// ============================================================
+function setupCheck() {
+  var out = [];
+  function mark(c, label, extra) { out.push((c ? '✅' : '❌') + ' ' + label + (extra ? ' — ' + extra : '')); return c; }
+
+  // 1) Propriedades do Script
+  var token = cfg_('NOTION_TOKEN'), dbId = cfg_('NOTION_DATABASE_ID'), team = cfg_('TEAM_EMAILS');
+  mark(!!token, 'NOTION_TOKEN configurado');
+  mark(!!dbId,  'NOTION_DATABASE_ID configurado', dbId || '(vazio)');
+  mark(!!team,  'TEAM_EMAILS configurado', team ? (team.split(',').length + ' e-mails') : '(vazio)');
+
+  // 2) Notion responde?
+  if (token && dbId) {
+    try { var pages = notionQueryChanged_(token, dbId, null); mark(true, 'Notion respondeu', pages.length + ' tarefas na base'); }
+    catch (e) { mark(false, 'Notion respondeu', String(e)); }
+  }
+
+  // 3) Serviço avançado "Chat" habilitado?
+  try { mark(typeof Chat !== 'undefined', 'Serviço avançado "Chat" habilitado'); }
+  catch (e) { mark(false, 'Serviço avançado "Chat" habilitado', String(e)); }
+
+  // 4) Admin SDK + resolução e-mail -> ID (precisa que a conta seja ADMIN do Workspace)
+  try {
+    var me = Session.getEffectiveUser().getEmail();
+    var id = resolveUserId_(me);
+    mark(!!id, 'Admin SDK resolve e-mail -> ID (conta é admin?)', me + ' -> ' + (id || 'NÃO resolveu'));
+  } catch (e) { mark(false, 'Admin SDK disponível', String(e)); }
+
+  // 5) Chat API lista espaços?
+  try { var sp = listSpaces_(); mark(true, 'Chat API lista espaços', sp.length + ' espaço(s) — rode listSpaces para ver os IDs'); }
+  catch (e) { mark(false, 'Chat API lista espaços (Chat API habilitada/configurada no Cloud?)', String(e)); }
+
+  // 6) Mapas de roteamento
+  var webhooks = cfgJson_('WEBHOOKS_JSON', {}), spaces = cfgJson_('SPACES_JSON', {});
+  out.push('ℹ️ WEBHOOKS_JSON: ' + Object.keys(webhooks).length + ' projeto(s) (mensagem SEM ping)');
+  out.push('ℹ️ SPACES_JSON: ' + Object.keys(spaces).length + ' projeto(s) (mensagem COM ping real)');
+
+  Logger.log('——— DIAGNÓSTICO Notion ↔ Google Chat ———\n' + out.join('\n'));
+}
+
+// ============================================================
+// LISTAR GRUPOS EXISTENTES — pra ter @ping nos grupos que JÁ existem
+// Rode e copie os IDs (spaces/XXX) para montar SPACES_JSON (Projeto -> spaces/XXX).
+// ============================================================
+function listSpaces() {
+  var sp = listSpaces_();
+  if (!sp.length) { Logger.log('Nenhum grupo encontrado (ou Chat API não habilitada/configurada).'); return; }
+  var lines = sp.map(function (s) { return '• ' + (s.displayName || '(sem nome)') + '   ->   ' + s.name; });
+  Logger.log('Grupos que você participa:\n' + lines.join('\n')
+    + '\n\nMonte SPACES_JSON assim (a CHAVE tem que ser o nome do PROJETO no Notion):\n'
+    + '{ "MDA DR": "spaces/AAA", "MIDIAS": "spaces/BBB" }');
+}
+
+function listSpaces_() {
+  var out = [], pageToken = null, guard = 0;
+  do {
+    var args = { pageSize: 100 };
+    if (pageToken) args.pageToken = pageToken;
+    var resp = Chat.Spaces.list(args);
+    (resp.spaces || []).forEach(function (s) {
+      if (s.spaceType === 'SPACE') out.push({ name: s.name, displayName: s.displayName });
+    });
+    pageToken = resp.nextPageToken || null;
+  } while (pageToken && ++guard < 20);
+  return out;
+}
+
+// ============================================================
+// TESTE DE PING ponta a ponta. Ex.:
+//   sendTestPing('spaces/AAA', 'axel@labyus.com')
+// Se a pessoa for notificada, o ping real está funcionando.
+// ============================================================
+function sendTestPing(spaceName, email) {
+  if (!spaceName || !email) { Logger.log('Use: sendTestPing("spaces/XXX", "pessoa@labyus.com")'); return; }
+  var id = resolveUserId_(email);
+  var ping = id ? ('<users/' + id + '>') : ('*' + email + '*');
+  postChatApi_(spaceName, ping + ' — 🔔 teste de ping do Notion ↔ Chat. Se você recebeu notificação, está OK!', null);
+  Logger.log('Enviado para ' + spaceName + ' pingando ' + email + (id ? '' : ' (sem ID — saiu só em negrito; cheque admin/Admin SDK)'));
+}
+
+// ============================================================
 // TEMPO REAL (push) — recebe o webhook da automação do Notion
 // Publicar como "App da Web" (Implantar > Nova implantação > App da Web).
 // Opcional: defina a propriedade WEBHOOK_SECRET e use a URL com ?key=SECRET.

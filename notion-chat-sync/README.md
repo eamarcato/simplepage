@@ -87,9 +87,23 @@ Requer apenas que a **Google Chat API** e o **Admin SDK** estejam habilitados (P
 ## Funções úteis
 | Função | Para quê |
 |---|---|
+| `setupCheck`     | **Rode primeiro.** Checklist ✅/❌ de tudo (Notion, Chat API, admin, mapas) |
+| `listSpaces`     | Lista os grupos existentes com o ID (`spaces/XXX`) para montar `SPACES_JSON` |
+| `sendTestPing`   | Manda um ping de teste num grupo: `sendTestPing("spaces/XXX","pessoa@labyus.com")` |
 | `testConnection` | Confere token/leitura do Notion |
 | `createTrigger`  | Liga a execução automática (5 min) |
 | `resetState`     | Zera as "fotos" (a próxima execução re-fotografa sem postar) |
+
+## Caminho COMPLETO (ping real) — ordem recomendada
+> O "ping" que notifica só sai pela **Chat API**. Para os grupos que **já existem**, mapeie-os em
+> `SPACES_JSON` (não em `WEBHOOKS_JSON`). A conta que autoriza precisa ser **admin do Workspace**.
+
+1. Faça as Partes A (1–4) e B acima (integração Notion, código, APIs Chat + Admin SDK, propriedades).
+2. Rode **`setupCheck`** → autorize → leia o log. Resolva o que estiver ❌.
+3. Rode **`listSpaces`** → copie os IDs e monte `SPACES_JSON` (`{"PROJETO":"spaces/XXX"}`).
+   *Deixe `WEBHOOKS_JSON` vazio nesses projetos — senão a mensagem sai sem ping.*
+4. Rode **`sendTestPing("spaces/XXX","voce@labyus.com")`** → confirme que notificou.
+5. Rode **`createTrigger`** → pronto, roda a cada 5 min.
 
 ## Notas
 - As mensagens nos grupos **existentes** saem pelo webhook (remetente do webhook); grupos **criados** pelo script postam via Chat API.
